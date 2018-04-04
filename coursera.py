@@ -55,10 +55,10 @@ def get_colums_max_width(table):
     colums_width = {}
     for row in table.rows:
         for cell in row:
-                colums_width[cell.column] = max((
-                    colums_width.get(cell.column, 0),
-                    len(str(cell.value))
-                ))
+            colums_width[cell.column] = max((
+                colums_width.get(cell.column, 0),
+                len(str(cell.value))
+            ))
     return colums_width
 
 
