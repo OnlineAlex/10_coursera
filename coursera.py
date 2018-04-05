@@ -5,8 +5,8 @@ import os
 import argparse
 
 
-def is_valid_path(argument_path):
-    if not os.path.exists(argument_path):
+def is_valid_dir(argument_path):
+    if not os.path.isdir(argument_path):
         error_message = 'Папка {} не существует'.format(argument_path)
         raise argparse.ArgumentTypeError(error_message)
 
@@ -17,25 +17,20 @@ def get_filedir():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'filedir',
-        type=is_valid_path,
+        type=is_valid_dir,
         help='Путь для сохранения файла'
     )
-    return parser.parse_args()
+    return parser.parse_args().filedir
 
 
-def get_courses_list(number_courses):
-    response = requests.get(
-        'https://www.coursera.org/sitemap~www~courses.xml',
-    )
-    courses_xml = BeautifulSoup(response.content, features='xml')
+def get_courses_list(page_list_courses, number_courses):
+    courses_xml = BeautifulSoup(page_list_courses, features='xml')
     courses = courses_xml.text.split()
     return courses[:number_courses]
 
 
-def get_course_info(course_url):
-    response = requests.get(course_url)
-    response.encoding = 'utf-8'
-    course_code = BeautifulSoup(response.text, 'html.parser')
+def get_course_info(course_page):
+    course_code = BeautifulSoup(course_page, 'html.parser')
     startdate_text = course_code.select_one('.startdate').text
     rating = course_code.select_one('.ratings-text')
     if rating:
@@ -47,7 +42,7 @@ def get_course_info(course_url):
         'date start': startdate_text[startdate_text.find(' ')+1:],
         'number week': len(course_code.select('.week')),
         'rating': rating,
-        'url': course_url
+        'url': course_code.find('meta', {'property': 'og:url'})['content']
     }
 
 
@@ -62,7 +57,7 @@ def get_colums_max_width(table):
     return colums_width
 
 
-def output_courses_info_to_xlsx(courses, filepath):
+def output_courses_info_to_xlsx(courses):
     courses_workbook = Workbook()
     courses_sheet = courses_workbook.active
     courses_sheet.append([
@@ -88,25 +83,30 @@ def output_courses_info_to_xlsx(courses, filepath):
     for column, value in colums_max_width.items():
         courses_sheet.column_dimensions[column].width = value
 
-    courses_workbook.save(filepath)
-    if os.path.exists(filepath):
-        return True
+    return courses_workbook
+
 
 
 if __name__ == '__main__':
-    arguments = get_filedir()
-    xlsx_filepath = os.path.join(arguments.filedir, 'courses.xlsx')
+    xlsx_filepath = os.path.join(get_filedir(), 'courses.xlsx')
 
     try:
-        courses_list = get_courses_list(number_courses=20)
+        courses_page = response = requests.get(
+            'https://www.coursera.org/sitemap~www~courses.xml',
+        ).content
+        courses_list = get_courses_list(courses_page, number_courses=20)
         courses_info = []
         for course in courses_list:
-            courses_info.append(get_course_info(course))
+            response = requests.get(course)
+            response.encoding = 'utf-8'
+            courses_info.append(get_course_info(response.text))
     except requests.ConnectionError:
         exit('Не удалось подключиться к серверу\n'
              'Проверьте интернет соеденние')
 
-    if output_courses_info_to_xlsx(courses_info, xlsx_filepath):
+    courses_xlsx = output_courses_info_to_xlsx(courses_info)
+    if courses_xlsx:
+        courses_xlsx.save(xlsx_filepath)
         print('Файл сохранен\n{}'.format(xlsx_filepath))
     else:
         print('Что-то пошло не так. Файл не сохранен.')
