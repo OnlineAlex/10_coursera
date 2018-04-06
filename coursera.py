@@ -13,14 +13,14 @@ def is_valid_dir(argument_path):
     return argument_path
 
 
-def get_filedir():
+def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'filedir',
         type=is_valid_dir,
         help='Путь для сохранения файла'
     )
-    return parser.parse_args().filedir
+    return parser.parse_args()
 
 
 def get_courses_list(page_list_courses, number_courses):
@@ -86,12 +86,14 @@ def output_courses_info_to_xlsx(courses):
     return courses_workbook
 
 
-
 if __name__ == '__main__':
-    xlsx_filepath = os.path.join(get_filedir(), 'courses.xlsx')
+    xlsx_filepath = os.path.join(
+        get_arguments().filedir,
+        'courses.xlsx'
+    )
 
     try:
-        courses_page = response = requests.get(
+        courses_page = requests.get(
             'https://www.coursera.org/sitemap~www~courses.xml',
         ).content
         courses_list = get_courses_list(courses_page, number_courses=20)
